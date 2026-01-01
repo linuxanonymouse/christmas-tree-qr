@@ -11,46 +11,73 @@ const ChristmasScene: React.FC = () => {
     const [gameState, setGameState] = useState<{ targetDate: number; hasEnded?: boolean; status?: string } | null>(null);
     const [qrCodeData, setQrCodeData] = useState<string | null>(null);
     const [showQr, setShowQr] = useState(false);
+    const [isFetchingQr, setIsFetchingQr] = useState(false);
+
+    // Dynamic light counting based on screen width
+    useEffect(() => {
+        const updateLights = () => {
+            setLightsCount(Math.ceil(window.innerWidth / 50));
+        };
+        updateLights();
+        window.addEventListener('resize', updateLights);
+        return () => window.removeEventListener('resize', updateLights);
+    }, []);
 
     useEffect(() => {
-        const fetchState = () => {
-            fetch('/api/game-state')
-                .then(res => res.json())
-                .then(data => {
-                    if (JSON.stringify(data) !== JSON.stringify(gameState)) {
-                        setGameState(data);
+        const fetchState = async () => {
+            try {
+                const res = await fetch('/api/game-state');
+                const data = await res.json();
+
+                setGameState(prevState => {
+                    // Only update and trigger side effects if something actually changed
+                    if (JSON.stringify(data) !== JSON.stringify(prevState)) {
                         if (data.status === 'IDLE' || data.status === 'COUNTDOWN') {
                             setShowQr(false);
                             setQrCodeData(null);
                         }
-                        if (data.status === 'REVEALED' && !qrCodeData) {
-                            fetchQrCoordinates();
-                        }
-                        setLightsCount(Math.ceil(window.innerWidth / 50));
+                        return data;
                     }
+                    return prevState;
                 });
+            } catch (err) {
+                console.error("Failed to fetch state", err);
+            }
         };
+
         fetchState();
-        const interval = setInterval(fetchState, 4000);
+        const interval = setInterval(fetchState, 3000);
         return () => clearInterval(interval);
-    }, [qrCodeData, gameState]);
+    }, []);
+
+    // Effect to handle QR fetching when status becomes REVEALED
+    useEffect(() => {
+        if (gameState?.status === 'REVEALED' && !qrCodeData && !isFetchingQr) {
+            fetchQrCoordinates();
+        }
+    }, [gameState?.status, qrCodeData, isFetchingQr]);
 
     const fetchQrCoordinates = async () => {
+        if (isFetchingQr) return;
+        setIsFetchingQr(true);
         try {
             const res = await fetch('/api/get-qr');
             if (res.status === 403) return;
             const data = await res.json();
             if (data.code) {
                 const claimUrl = `${window.location.origin}/claim/${data.code}`;
-                const qrImage = await QRCode.toDataURL(claimUrl, { width: 300, margin: 2, color: { dark: '#711723', light: '#ffffff' } });
+                const qrImage = await QRCode.toDataURL(claimUrl, {
+                    width: 300,
+                    margin: 2,
+                    color: { dark: '#711723', light: '#ffffff' }
+                });
                 setQrCodeData(qrImage);
                 setShowQr(true);
-            } else if (data.error) {
-                setQrCodeData(null);
-                alert(`Santa's Bag is Empty!\n${data.error}\n(${data.debug || 'Check Admin'})`);
             }
         } catch (err) {
             console.error("Failed to load QR", err);
+        } finally {
+            setIsFetchingQr(false);
         }
     };
 
