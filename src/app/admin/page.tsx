@@ -11,6 +11,7 @@ export default function AdminPage() {
     const [state, setState] = useState<any>(null);
     const [newCode, setNewCode] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Check login
     const login = async (pass: string) => {
@@ -33,25 +34,33 @@ export default function AdminPage() {
         setLoading(false);
     };
 
-    const refreshState = async () => {
-        if (!key) return;
-        const res = await fetch('/api/admin/config', {
-            headers: { 'x-admin-key': key }
-        });
-        if (res.ok) setState(await res.json());
+    const refreshState = async (force = false) => {
+        if (!key || (isSaving && !force)) return;
+        try {
+            const res = await fetch('/api/admin/config', {
+                headers: { 'x-admin-key': key }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setState(data);
+            }
+        } catch (e) {
+            console.error("Refresh failed", e);
+        }
     };
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
         if (isLoggedIn) {
-            refreshState();
-            interval = setInterval(refreshState, 3000);
+            refreshState(true);
+            interval = setInterval(() => refreshState(false), 3000);
         }
         return () => clearInterval(interval);
-    }, [isLoggedIn, key]);
+    }, [isLoggedIn, key, isSaving]);
 
     const updateState = async (updates: any) => {
         setLoading(true);
+        setIsSaving(true);
         try {
             const res = await fetch('/api/admin/config', {
                 method: 'POST',
@@ -61,16 +70,19 @@ export default function AdminPage() {
                 },
                 body: JSON.stringify(updates)
             });
-            if (res.ok) {
-                await refreshState();
+            const data = await res.json();
+            if (res.ok && data.state) {
+                setState(data.state);
             } else {
-                const data = await res.json();
                 alert(`Save Failed: ${data.error || 'Unknown Error'}`);
+                // Refresh to recover correct state
+                await refreshState(true);
             }
         } catch (e) {
             alert('Network Error while saving');
         } finally {
             setLoading(false);
+            setIsSaving(false);
         }
     };
 
@@ -84,8 +96,24 @@ export default function AdminPage() {
     };
 
     const removeCode = async (codeToRemove: string) => {
+        const indexToRemove = state.winningCodes.indexOf(codeToRemove);
+        if (indexToRemove === -1) return;
+
         const updatedCodes = state.winningCodes.filter((c: string) => c !== codeToRemove);
-        await updateState({ winningCodes: updatedCodes });
+
+        let newActiveIndex = state.activeQrIndex;
+        // If we removed the current active code or something before it, adjust index
+        if (indexToRemove <= state.activeQrIndex) {
+            newActiveIndex = Math.max(0, state.activeQrIndex - 1);
+        }
+
+        // If list is empty, reset index
+        if (updatedCodes.length === 0) newActiveIndex = 0;
+
+        await updateState({
+            winningCodes: updatedCodes,
+            activeQrIndex: newActiveIndex
+        });
     };
 
     const setEndTimeNow = () => {
