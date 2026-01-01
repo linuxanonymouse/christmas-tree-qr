@@ -97,7 +97,7 @@ export default function AdminPage() {
         // Christmas next year
         const now = new Date();
         const xmas = new Date(now.getFullYear(), 11, 25).getTime();
-        updateState({ targetDate: xmas, claimedCodes: [] });
+        updateState({ targetDate: xmas, claimedCodes: [], activeQrIndex: 0, status: 'IDLE' });
     };
 
     if (!isLoggedIn) {
