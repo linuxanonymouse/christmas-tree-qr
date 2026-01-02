@@ -28,7 +28,13 @@ class GameStorage {
                 if (typeof parsed.activeQrIndex !== 'number' || isNaN(parsed.activeQrIndex)) {
                     parsed.activeQrIndex = 0;
                 }
-                return { ...this.defaultState(), ...parsed };
+                return {
+                    targetDate: parsed.targetDate ?? null,
+                    status: parsed.status ?? 'IDLE',
+                    winningCodes: Array.isArray(parsed.winningCodes) ? parsed.winningCodes : [],
+                    claimedCodes: Array.isArray(parsed.claimedCodes) ? parsed.claimedCodes : [],
+                    activeQrIndex: typeof parsed.activeQrIndex === 'number' ? parsed.activeQrIndex : 0
+                };
             }
         } catch (e) {
             console.error("Failed to load DB", e);
@@ -100,6 +106,7 @@ class GameStorage {
             activeQrIndex = isNaN(index) ? 0 : index;
         }
         if (updates.claimedCodes !== undefined) claimedCodes = updates.claimedCodes;
+        if (updates.winningCodes !== undefined) winningCodes = updates.winningCodes;
 
         // Auto-status logic based on targetDate
         if (updates.targetDate !== undefined) {
