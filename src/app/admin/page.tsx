@@ -95,15 +95,15 @@ export default function AdminPage() {
 
     const addWinningCode = async () => {
         if (!newCode || isSaving) return;
-        // Encode to base64
-        const b64 = btoa(newCode);
-        await updateState({ addCode: b64 });
+        const updatedCodes = [...(state.winningCodes || []), newCode];
+        await updateState({ winningCodes: updatedCodes });
         setNewCode('');
     };
 
     const removeCode = async (codeToRemove: string) => {
         if (isSaving) return;
-        await updateState({ removeCode: codeToRemove });
+        const updatedCodes = state.winningCodes.filter((c: string) => c !== codeToRemove);
+        await updateState({ winningCodes: updatedCodes });
     };
 
     const setEndTimeNow = () => {
@@ -116,7 +116,7 @@ export default function AdminPage() {
         if (confirm("Are you sure you want to reset the entire game?")) {
             const now = new Date();
             const xmas = new Date(now.getFullYear(), 11, 25).getTime();
-            updateState({ targetDate: xmas, claimedCodes: [], activeQrIndex: 0, status: 'IDLE' });
+            updateState({ targetDate: xmas, activeQrIndex: 0, status: 'IDLE', winningCodes: [] });
         }
     };
 
@@ -285,7 +285,7 @@ export default function AdminPage() {
                                 <input
                                     value={newCode}
                                     onChange={e => setNewCode(e.target.value)}
-                                    placeholder="Enter prize key"
+                                    placeholder="Enter prize text"
                                     className="flex-1 p-2 bg-gray-900 border border-gray-600 rounded text-white"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') addWinningCode();
@@ -303,30 +303,24 @@ export default function AdminPage() {
 
                             <div className="space-y-2">
                                 {state.winningCodes.map((code: string, i: number) => {
-                                    const decoded = atob(code);
-                                    const isClaimed = state.claimedCodes.includes(code);
                                     const isActive = i === state.activeQrIndex;
 
                                     return (
                                         <div key={i} className={`flex justify-between items-center p-3 rounded border transition-all ${isActive ? 'bg-purple-900 border-purple-500 shadow-xl scale-[1.02]' : 'bg-gray-900 border-transparent'}`}>
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-lg font-bold mr-3">{decoded}</span>
+                                                    <span className="font-mono text-lg font-bold mr-3">{code}</span>
                                                     {isActive && <span className="bg-purple-600 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">ACTIVE</span>}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                {isClaimed ? (
-                                                    <span className="text-red-500 font-bold px-2 py-1 bg-red-900/20 rounded text-xs">CLAIMED</span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => removeCode(code)}
-                                                        className="text-red-400 hover:text-red-300 disabled:opacity-50"
-                                                        disabled={isSaving}
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={() => removeCode(code)}
+                                                    className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                                                    disabled={isSaving}
+                                                >
+                                                    Remove
+                                                </button>
                                             </div>
                                         </div>
                                     );

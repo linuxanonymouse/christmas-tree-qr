@@ -41,13 +41,17 @@ const ChristmasScene: React.FC = () => {
             if (res.status === 403) return;
             const data = await res.json();
             if (data.code) {
-                const claimUrl = `${window.location.origin}/claim/${data.code}`;
-                const qrImage = await QRCode.toDataURL(claimUrl, { width: 300, margin: 2, color: { dark: '#711723', light: '#ffffff' } });
+                // Generate QR directly for the code content (no more URL)
+                const qrImage = await QRCode.toDataURL(data.code, {
+                    width: 300,
+                    margin: 2,
+                    color: { dark: '#711723', light: '#ffffff' }
+                });
                 setQrCodeData(qrImage);
                 setShowQr(true);
             } else if (data.error) {
                 setQrCodeData(null);
-                alert(`Santa's Bag is Empty!\n${data.error}\n(${data.debug || 'Check Admin'})`);
+                alert(`Santa's Bag is Empty!\n${data.error}`);
             }
         } catch (err) {
             console.error("Failed to load QR", err);

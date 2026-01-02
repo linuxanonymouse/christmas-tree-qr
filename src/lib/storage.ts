@@ -7,8 +7,7 @@ export type GameStatus = 'IDLE' | 'COUNTDOWN' | 'REVEALED';
 export type GameState = {
     targetDate: number | null; // Timestamp (Launch Date) of current round
     status: GameStatus;
-    winningCodes: string[]; // Base64 strings
-    claimedCodes: string[];
+    winningCodes: string[]; // Raw strings (no longer Base64)
     activeQrIndex: number; // Which QR to show (if multiple)
 };
 
@@ -21,7 +20,6 @@ class GameStorage {
             targetDate: null,
             status: 'IDLE',
             winningCodes: [],
-            claimedCodes: [],
             activeQrIndex: 0
         };
     }
@@ -82,32 +80,14 @@ class GameStorage {
         }
     }
 
-    async update(updates: any) {
+    async update(updates: Partial<GameState>) {
         const currentState = await this.getSnapshot();
 
         // Logical copy
-        let newState: GameState = { ...currentState };
-
-        // Handle the user's preferred "addCode" / "removeCode" shorthand if they keep sending it
-        if (updates.addCode) {
-            if (!newState.winningCodes.includes(updates.addCode)) {
-                newState.winningCodes = [...newState.winningCodes, updates.addCode];
-            }
-        }
-        if (updates.removeCode) {
-            newState.winningCodes = newState.winningCodes.filter(c => c !== updates.removeCode);
-        }
-
-        // Core field updates
-        if (updates.status !== undefined) newState.status = updates.status;
-        if (updates.targetDate !== undefined) newState.targetDate = updates.targetDate;
-        if (updates.claimedCodes !== undefined) newState.claimedCodes = updates.claimedCodes;
-        if (updates.winningCodes !== undefined) newState.winningCodes = updates.winningCodes;
-
-        if (updates.activeQrIndex !== undefined) {
-            const index = Number(updates.activeQrIndex);
-            newState.activeQrIndex = isNaN(index) ? 0 : index;
-        }
+        let newState: GameState = {
+            ...currentState,
+            ...updates
+        };
 
         // Auto-status logic
         if (updates.targetDate !== undefined) {
@@ -118,26 +98,14 @@ class GameStorage {
             }
         }
 
+        // Sanitize activeQrIndex
+        if (updates.activeQrIndex !== undefined) {
+            const index = Number(updates.activeQrIndex);
+            newState.activeQrIndex = isNaN(index) ? 0 : index;
+        }
+
         await this.save(newState);
         return newState;
-    }
-
-    async attemptClaim(code: string): Promise<{ success: boolean; message: string }> {
-        const state = await this.getSnapshot();
-        const activeCode = state.winningCodes[state.activeQrIndex];
-
-        if (code !== activeCode) {
-            return { success: false, message: 'This code is expired or invalid for the current round.' };
-        }
-
-        if (state.claimedCodes.includes(code)) {
-            return { success: false, message: 'This code has already been claimed!' };
-        }
-
-        state.claimedCodes = [...state.claimedCodes, code];
-        await this.save(state);
-
-        return { success: true, message: 'Congratulations! You won a prize!' };
     }
 }
 

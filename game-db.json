@@ -1,7 +1,8 @@
 {
-  "targetDate": 1767391639170,
+  "targetDate": 1767392326068,
   "status": "REVEALED",
-  "winningCodes": [],
-  "claimedCodes": [],
+  "winningCodes": [
+    "test"
+  ],
   "activeQrIndex": 0
 }

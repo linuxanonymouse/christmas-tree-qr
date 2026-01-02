@@ -13,7 +13,7 @@ export async function GET() {
     const code = state.winningCodes[state.activeQrIndex];
 
     if (!code) {
-        return NextResponse.json({ error: 'No prize set' }, { status: 404 });
+        return new NextResponse('No prize set', { status: 404 });
     }
 
     return NextResponse.json({ code });
