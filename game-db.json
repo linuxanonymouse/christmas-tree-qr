@@ -1,9 +1,9 @@
 {
-  "targetDate": null,
-  "status": "IDLE",
-  "winningCodes": [],
+  "targetDate": 1767270098546,
+  "status": "REVEALED",
+  "winningCodes": [
+    "NTU1"
+  ],
   "claimedCodes": [],
-  "activeQrIndex": 0,
-  "addCode": "VEVTVDEyMzQ=",
-  "removeCode": "NTU1"
+  "activeQrIndex": 0
 }
