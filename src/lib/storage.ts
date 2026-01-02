@@ -14,9 +14,10 @@ export type GameState = {
 const DB_PATH = path.join(process.cwd(), 'game-db.json');
 
 class GameStorage {
+    private state: GameState;
+
     constructor() {
-        // Just ensure file exists on startup
-        this.load();
+        this.state = this.load();
     }
 
     private load(): GameState {
@@ -36,9 +37,9 @@ class GameStorage {
         return this.defaultState();
     }
 
-    private save(state: GameState) {
+    private save() {
         try {
-            fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
+            fs.writeFileSync(DB_PATH, JSON.stringify(this.state, null, 2));
         } catch (e) {
             console.error("Failed to save DB", e);
         }
@@ -54,56 +55,53 @@ class GameStorage {
         };
     }
 
-    // Always reload from disk to ensure we have the freshest data
+    // Check for auto-transitions before returning state
     get State() {
-        const state = this.load();
-        if (state.status === 'COUNTDOWN' && state.targetDate && Date.now() >= state.targetDate) {
-            state.status = 'REVEALED';
-            this.save(state); // Persist the transition!
+        if (this.state.status === 'COUNTDOWN' && this.state.targetDate && Date.now() >= this.state.targetDate) {
+            this.state.status = 'REVEALED';
+            this.save(); // Persist the transition!
         }
-        return state;
+        return this.state;
     }
 
-    update(updates: Partial<GameState>) {
-        // RELOAD FIRST to prevent overwriting newer disk data with stale memory
-        const currentState = this.load();
-
-        let newState = { ...currentState, ...updates };
-
-        // Auto-status logic based on targetDate
-        if (updates.targetDate !== undefined) {
-            if (updates.targetDate === null) {
-                if (!updates.status) newState.status = 'IDLE';
-            } else if (Date.now() < updates.targetDate) {
-                newState.status = 'COUNTDOWN';
+    update(newState: Partial<GameState>) {
+        if (newState.targetDate !== undefined) {
+            if (newState.targetDate === null) {
+                // Reset
+                if (!newState.status) this.state.status = 'IDLE';
+            } else if (Date.now() < newState.targetDate) {
+                this.state.status = 'COUNTDOWN';
             }
         }
 
         // Sanitize activeQrIndex
-        if (updates.activeQrIndex !== undefined) {
-            const index = Number(updates.activeQrIndex);
-            newState.activeQrIndex = isNaN(index) ? 0 : index;
+        if (newState.activeQrIndex !== undefined) {
+            const index = Number(newState.activeQrIndex);
+            this.state.activeQrIndex = isNaN(index) ? 0 : index;
         }
 
-        this.save(newState);
+        const { activeQrIndex, ...otherUpdates } = newState;
+        this.state = { ...this.state, ...otherUpdates };
+        this.save();
     }
 
     attemptClaim(code: string): { success: boolean; message: string } {
-        // RELOAD FIRST
-        const state = this.load();
-        const activeCode = state.winningCodes[state.activeQrIndex];
+        const activeCode = this.state.winningCodes[this.state.activeQrIndex];
 
         if (code !== activeCode) {
             return { success: false, message: 'This code is expired or invalid for the current round.' };
         }
 
-        if (state.claimedCodes.includes(code)) {
+        if (this.state.claimedCodes.includes(code)) {
             return { success: false, message: 'This code has already been claimed!' };
         }
 
         // Mark as claimed
-        state.claimedCodes = [...state.claimedCodes, code];
-        this.save(state);
+        this.state = {
+            ...this.state,
+            claimedCodes: [...this.state.claimedCodes, code]
+        };
+        this.save();
 
         return { success: true, message: 'Congratulations! You won a prize!' };
     }
