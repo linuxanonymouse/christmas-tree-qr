@@ -1,7 +1,7 @@
 {
-    "targetDate": null,
-    "status": "IDLE",
-    "winningCodes": [],
-    "claimedCodes": [],
-    "activeQrIndex": 0
+  "targetDate": 1767390374752,
+  "status": "REVEALED",
+  "winningCodes": [],
+  "claimedCodes": [],
+  "activeQrIndex": 0
 }
