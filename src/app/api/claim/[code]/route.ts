@@ -7,17 +7,16 @@ export async function POST(
 ) {
     try {
         const { code } = await params; // Await params in newer Next.js
-        const decodedCode = atob(code); // Decode Base64
+        const decoded = atob(code); // It's base64 encoded by default in our app
+        console.log(`Attempting claim for ${decoded}`);
 
-        // Simple validation: Ensure it's a number as per user request ("number is base64 encoded")
-        if (isNaN(Number(decodedCode))) {
-            return NextResponse.json({ error: 'Invalid code format' }, { status: 400 });
+        const result = await storage.attemptClaim(code);
+        if (result.success) {
+            return NextResponse.json({ message: result.message });
+        } else {
+            return NextResponse.json({ error: result.message }, { status: 400 });
         }
-
-        const { success, message } = storage.attemptClaim(code);
-
-        return NextResponse.json({ success, message });
-    } catch (error) {
-        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    } catch (e) {
+        return NextResponse.json({ error: 'Invalid format' }, { status: 400 });
     }
 }

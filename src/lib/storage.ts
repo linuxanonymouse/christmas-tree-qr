@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { kv } from '@vercel/kv';
 
 export type GameStatus = 'IDLE' | 'COUNTDOWN' | 'REVEALED';
 
@@ -12,39 +13,9 @@ export type GameState = {
 };
 
 const DB_PATH = path.join(process.cwd(), 'game-db.json');
+const IS_VERCEL = !!process.env.KV_REST_API_URL;
 
 class GameStorage {
-    private state: GameState;
-
-    constructor() {
-        this.state = this.load();
-    }
-
-    private load(): GameState {
-        try {
-            if (fs.existsSync(DB_PATH)) {
-                const data = fs.readFileSync(DB_PATH, 'utf-8');
-                const parsed = JSON.parse(data);
-                // Ensure activeQrIndex is a number
-                if (typeof parsed.activeQrIndex !== 'number' || isNaN(parsed.activeQrIndex)) {
-                    parsed.activeQrIndex = 0;
-                }
-                return { ...this.defaultState(), ...parsed };
-            }
-        } catch (e) {
-            console.error("Failed to load DB", e);
-        }
-        return this.defaultState();
-    }
-
-    private save() {
-        try {
-            fs.writeFileSync(DB_PATH, JSON.stringify(this.state, null, 2));
-        } catch (e) {
-            console.error("Failed to save DB", e);
-        }
-    }
-
     private defaultState(): GameState {
         return {
             targetDate: null,
@@ -55,62 +26,119 @@ class GameStorage {
         };
     }
 
-    // Check for auto-transitions before returning state
-    get State() {
-        if (this.state.status === 'COUNTDOWN' && this.state.targetDate && Date.now() >= this.state.targetDate) {
-            this.state.status = 'REVEALED';
-            this.save(); // Persist the transition!
-        }
-        return this.state;
-    }
+    async getSnapshot(): Promise<GameState> {
+        let state: GameState;
 
-    update(newState: Partial<GameState>) {
-        if (newState.targetDate !== undefined) {
-            if (newState.targetDate === null) {
-                // Reset
-                if (!newState.status) this.state.status = 'IDLE';
-            } else if (Date.now() < newState.targetDate) {
-                this.state.status = 'COUNTDOWN';
+        if (IS_VERCEL) {
+            try {
+                const data = await kv.get<GameState>('game_state');
+                state = data || this.defaultState();
+            } catch (e) {
+                console.error("Failed to load from KV", e);
+                state = this.defaultState();
+            }
+        } else {
+            try {
+                if (fs.existsSync(DB_PATH)) {
+                    const data = fs.readFileSync(DB_PATH, 'utf-8');
+                    state = JSON.parse(data);
+                } else {
+                    state = this.defaultState();
+                }
+            } catch (e) {
+                console.error("Failed to load from Disk", e);
+                state = this.defaultState();
             }
         }
 
-        // Sanitize activeQrIndex
-        if (newState.activeQrIndex !== undefined) {
-            const index = Number(newState.activeQrIndex);
-            this.state.activeQrIndex = isNaN(index) ? 0 : index;
+        // Sanitize
+        state = { ...this.defaultState(), ...state };
+        if (typeof state.activeQrIndex !== 'number' || isNaN(state.activeQrIndex)) {
+            state.activeQrIndex = 0;
         }
 
-        const { activeQrIndex, ...otherUpdates } = newState;
-        this.state = { ...this.state, ...otherUpdates };
-        this.save();
+        // Handle auto-transition from COUNTDOWN to REVEALED
+        if (state.status === 'COUNTDOWN' && state.targetDate && Date.now() >= state.targetDate) {
+            state.status = 'REVEALED';
+            await this.save(state);
+        }
+
+        return state;
     }
 
-    attemptClaim(code: string): { success: boolean; message: string } {
-        const activeCode = this.state.winningCodes[this.state.activeQrIndex];
+    private async save(state: GameState) {
+        if (IS_VERCEL) {
+            try {
+                await kv.set('game_state', state);
+            } catch (e) {
+                console.error("Failed to save to KV", e);
+            }
+        } else {
+            try {
+                fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
+            } catch (e) {
+                console.error("Failed to save to Disk", e);
+            }
+        }
+    }
+
+    async update(updates: any) {
+        const currentState = await this.getSnapshot();
+
+        // Logical copy
+        let newState: GameState = { ...currentState };
+
+        // Handle the user's preferred "addCode" / "removeCode" shorthand if they keep sending it
+        if (updates.addCode) {
+            if (!newState.winningCodes.includes(updates.addCode)) {
+                newState.winningCodes = [...newState.winningCodes, updates.addCode];
+            }
+        }
+        if (updates.removeCode) {
+            newState.winningCodes = newState.winningCodes.filter(c => c !== updates.removeCode);
+        }
+
+        // Core field updates
+        if (updates.status !== undefined) newState.status = updates.status;
+        if (updates.targetDate !== undefined) newState.targetDate = updates.targetDate;
+        if (updates.claimedCodes !== undefined) newState.claimedCodes = updates.claimedCodes;
+        if (updates.winningCodes !== undefined) newState.winningCodes = updates.winningCodes;
+
+        if (updates.activeQrIndex !== undefined) {
+            const index = Number(updates.activeQrIndex);
+            newState.activeQrIndex = isNaN(index) ? 0 : index;
+        }
+
+        // Auto-status logic
+        if (updates.targetDate !== undefined) {
+            if (updates.targetDate === null) {
+                if (!updates.status) newState.status = 'IDLE';
+            } else if (Date.now() < updates.targetDate) {
+                newState.status = 'COUNTDOWN';
+            }
+        }
+
+        await this.save(newState);
+        return newState;
+    }
+
+    async attemptClaim(code: string): Promise<{ success: boolean; message: string }> {
+        const state = await this.getSnapshot();
+        const activeCode = state.winningCodes[state.activeQrIndex];
 
         if (code !== activeCode) {
             return { success: false, message: 'This code is expired or invalid for the current round.' };
         }
 
-        if (this.state.claimedCodes.includes(code)) {
+        if (state.claimedCodes.includes(code)) {
             return { success: false, message: 'This code has already been claimed!' };
         }
 
-        // Mark as claimed
-        this.state = {
-            ...this.state,
-            claimedCodes: [...this.state.claimedCodes, code]
-        };
-        this.save();
+        state.claimedCodes = [...state.claimedCodes, code];
+        await this.save(state);
 
         return { success: true, message: 'Congratulations! You won a prize!' };
     }
 }
 
-// NextJS caches modules, so this singleton persists in dev/prod usually (until restart)
-// For a real app, use a database.
-const globalForStorage = global as unknown as { storage: GameStorage };
-
-export const storage = globalForStorage.storage || new GameStorage();
-
-if (process.env.NODE_ENV !== 'production') globalForStorage.storage = storage;
+export const storage = new GameStorage();
