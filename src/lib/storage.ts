@@ -64,45 +64,24 @@ class GameStorage {
         return state;
     }
 
-    update(updates: any) {
+    update(updates: Partial<GameState>) {
         // RELOAD FIRST to prevent overwriting newer disk data with stale memory
         const currentState = this.load();
-        let newState = { ...currentState };
 
-        // Handle Atomic List Updates first (to prevent stale array overwrites)
-        if (updates.addCode) {
-            if (!newState.winningCodes.includes(updates.addCode)) {
-                newState.winningCodes = [...newState.winningCodes, updates.addCode];
-            }
-        }
-
-        if (updates.removeCode) {
-            const indexToRemove = newState.winningCodes.indexOf(updates.removeCode);
-            if (indexToRemove !== -1) {
-                newState.winningCodes = newState.winningCodes.filter(c => c !== updates.removeCode);
-                // Adjust index if we removed the current round or something before it
-                if (indexToRemove <= newState.activeQrIndex) {
-                    newState.activeQrIndex = Math.max(0, newState.activeQrIndex - 1);
-                }
-            }
-        }
-
-        // Apply standard updates
-        const { addCode, removeCode, ...standardUpdates } = updates;
-        newState = { ...newState, ...standardUpdates };
+        let newState = { ...currentState, ...updates };
 
         // Auto-status logic based on targetDate
-        if (standardUpdates.targetDate !== undefined) {
-            if (standardUpdates.targetDate === null) {
-                if (!standardUpdates.status) newState.status = 'IDLE';
-            } else if (Date.now() < standardUpdates.targetDate) {
+        if (updates.targetDate !== undefined) {
+            if (updates.targetDate === null) {
+                if (!updates.status) newState.status = 'IDLE';
+            } else if (Date.now() < updates.targetDate) {
                 newState.status = 'COUNTDOWN';
             }
         }
 
-        // Sanitize activeQrIndex if directly provided
-        if (standardUpdates.activeQrIndex !== undefined) {
-            const index = Number(standardUpdates.activeQrIndex);
+        // Sanitize activeQrIndex
+        if (updates.activeQrIndex !== undefined) {
+            const index = Number(updates.activeQrIndex);
             newState.activeQrIndex = isNaN(index) ? 0 : index;
         }
 
