@@ -155,7 +155,7 @@ export default function AdminPage() {
                             <h2 className="text-xl font-bold mb-4">Game Control</h2>
                             <div className="flex flex-col gap-6">
 
-                                <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+                                <div className="flex gap-4 items-stretch">
                                     {/* Status Indicator */}
                                     <div className="bg-black/20 p-4 rounded-lg flex-1 border border-gray-700 relative">
                                         <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live Updates Active"></div>
@@ -173,7 +173,7 @@ export default function AdminPage() {
                                     {/* Round Indicator & Editor */}
                                     <div className="bg-black/20 p-4 rounded-lg flex-1 border border-gray-700">
                                         <label className="block text-gray-400 text-xs uppercase font-bold mb-2">Current Round</label>
-                                        <div className="flex items-center flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
                                             <span className="text-xl font-bold">#</span>
                                             <input
                                                 type="number"
@@ -203,14 +203,14 @@ export default function AdminPage() {
                                 </div>
 
                                 {/* Actions */}
-                                <div className="border-t border-gray-700 pt-6 flex flex-col sm:flex-row flex-wrap gap-4">
+                                <div className="border-t border-gray-700 pt-6 flex flex-wrap gap-4">
                                     {state.status === 'IDLE' && (
-                                        <div className="flex items-center gap-2 bg-gray-700/50 p-2 rounded-lg w-full sm:w-auto">
+                                        <div className="flex items-center gap-2 bg-gray-700/50 p-2 rounded-lg">
                                             <input
                                                 type="number"
                                                 placeholder="Mins"
                                                 defaultValue="5"
-                                                className="w-16 sm:w-20 bg-gray-900 border border-gray-600 p-2 rounded text-white text-center font-bold"
+                                                className="w-20 bg-gray-900 border border-gray-600 p-2 rounded text-white text-center font-bold"
                                                 id="minutesInput"
                                             />
                                             <button
@@ -220,7 +220,7 @@ export default function AdminPage() {
                                                     const target = Date.now() + (mins * 60 * 1000);
                                                     updateState({ targetDate: target, status: 'COUNTDOWN' });
                                                 }}
-                                                className="flex-1 sm:px-6 py-2 bg-green-600 hover:bg-green-500 rounded font-bold transition-all"
+                                                className="px-6 py-2 bg-green-600 hover:bg-green-500 rounded font-bold transition-all"
                                             >
                                                 Start Countdown
                                             </button>
@@ -228,7 +228,7 @@ export default function AdminPage() {
                                     )}
 
                                     {state.status === 'COUNTDOWN' && (
-                                        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                                        <>
                                             <button
                                                 onClick={setEndTimeNow}
                                                 className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-bold transition-transform hover:scale-105"
@@ -241,7 +241,7 @@ export default function AdminPage() {
                                             >
                                                 Abort Countdown
                                             </button>
-                                        </div>
+                                        </>
                                     )}
 
                                     {state.status === 'REVEALED' && (
@@ -254,13 +254,13 @@ export default function AdminPage() {
                                                     status: 'IDLE'
                                                 });
                                             }}
-                                            className="w-full sm:w-auto px-8 py-3 bg-purple-600 hover:bg-purple-500 rounded font-bold shadow-lg text-lg animate-pulse"
+                                            className="px-8 py-3 bg-purple-600 hover:bg-purple-500 rounded font-bold shadow-lg text-lg animate-pulse"
                                         >
                                             Start Next Round &rarr;
                                         </button>
                                     )}
 
-                                    <button onClick={resetGame} className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold sm:ml-auto">
+                                    <button onClick={resetGame} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold ml-auto">
                                         Reset Game State
                                     </button>
                                 </div>
@@ -270,14 +270,14 @@ export default function AdminPage() {
                         {/* Winning Codes */}
                         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
                             <h2 className="text-xl font-bold mb-4">Winning Codes</h2>
-                            <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                            <div className="flex gap-2 mb-6">
                                 <input
                                     value={newCode}
                                     onChange={e => setNewCode(e.target.value)}
-                                    placeholder="Enter prize key"
-                                    className="flex-1 p-2 bg-gray-900 border border-gray-600 rounded text-white min-w-0"
+                                    placeholder="Enter a winning number (e.g. 1001)"
+                                    className="flex-1 p-2 bg-gray-900 border border-gray-600 rounded text-white"
                                 />
-                                <button onClick={addWinningCode} className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded font-bold whitespace-nowrap">
+                                <button onClick={addWinningCode} className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded font-bold">
                                     Add Code
                                 </button>
                             </div>
